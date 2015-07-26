@@ -1,0 +1,23 @@
+_package user
+$
+
+_method property_list.assert_equals?(p_other)
+	_if p_other _is _unset _orif
+	    _not p_other.is_kind_of?(_self) _orif
+	    _self.size <> p_other.size
+	_then
+		_return _false
+	_endif
+	
+	_for i_key, i_value _over _self.fast_keys_and_elements()
+	_loop
+		_if _not p_other.includes_key?(i_key) _orif
+		    p_other[i_key] <> i_value
+		_then
+			_return _false
+		_endif
+	_endloop
+	
+	_return _true
+_endmethod
+$

@@ -1,0 +1,30 @@
+_package user
+
+_pragma(classify_level=advanced)
+_method simple_xml_thing.find_element(p_type)
+	_for i _over _self.find_elements(p_type)
+	_loop
+		_return i
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=advanced)
+_iter _method simple_xml_thing.find_elements(p_type)
+	l_stack << stack.new_from(_self.xml_elements)
+	_loop
+		l_element << l_stack.next()
+		_if l_element _is _unset _then _leave _endif
+		
+		_if l_element.is_class_of?(simple_xml_thing)
+		_then
+			l_stack.add_all(l_element.xml_elements)
+			
+			_if l_element.type = p_type
+			_then
+				_loopbody(l_element)
+			_endif
+		_endif
+	_endloop
+_endmethod
+$

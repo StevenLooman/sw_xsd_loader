@@ -1,0 +1,533 @@
+# TODO:
+# ~ try as drop-in replacement for tga
+#   ~ tga_elements() and friends
+#     - many friends... overload xsd_loader:xsd_loader.generate_slot_name()
+#   + testing with real application
+# + show_on() for testing
+#   + conflicting method handling
+# ~ xsd_restriction
+#   + rename xsd_enumerator to xsd_restriction
+#   + support xs:string enumerations
+#   + support xs:string patterns
+#   - support xs:int
+#     - xs:minInclusive
+#     - xs:maxInclusive
+#
+# Next TODO:
+# - able to validate an actual XML
+#   - count restriction/testing
+# + for complexType, check what is assigned, is of right type
+#   + how to automatically define/generate set methods for slots?
+#   X private slots + does_not_understand() abusing?
+
+_package xsd_loader
+
+_block
+	remex(:xsd_loader)
+_endblock
+$
+
+def_slotted_exemplar(
+	:xsd_loader,
+	{
+		{:target_package, _unset, :readable, :public},
+		{:exemplar_prefix, _unset, :readable, :public},
+		{:base_exemplar, _unset, :readable, :public},
+		{:xsd, _unset, :readable, :public},
+		{:types, _unset, :readable, :public},
+		{:anonymous_types, _unset, :readable, :public}
+	})
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_method xsd_loader.new_from_file(p_filename, _optional p_target_package, p_exemplar_prefix, p_base_exemplar)
+	##
+	_return _clone.init_from_file(p_filename, p_target_package, p_exemplar_prefix, p_base_exemplar)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_private _method xsd_loader.init_from_file(p_filename, p_target_package, p_exemplar_prefix, p_base_exemplar)
+	##
+	_self.init(p_target_package, p_exemplar_prefix, p_base_exemplar)
+	.xsd << simple_xml.read_document_file(p_filename)
+	_return _self
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_method xsd_loader.new_from_string(p_xsd_string, _optional p_target_package, p_exemplar_prefix, p_base_exemplar)
+	##
+	_return _clone.init_from_string(p_xsd_string, p_target_package, p_exemplar_prefix, p_base_exemplar)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_private _method xsd_loader.init_from_string(p_xsd_string, p_target_package, p_exemplar_prefix, p_base_exemplar)
+	_self.init(p_target_package, p_exemplar_prefix, p_base_exemplar)
+	.xsd << simple_xml.read_document_string(p_xsd_string)
+	_return _self
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_private _method xsd_loader.init(p_target_package, p_exemplar_prefix, p_base_exemplar)
+	##
+	# sanity
+	_if p_target_package _isnt _unset _andif
+	    _not sw:package.all_packages.includes_key?(p_target_package)
+	_then
+		condition.raise(:no_such_package)
+	_endif
+	
+	.target_package << sw:package.all_packages[p_target_package.default(:user)]
+	.exemplar_prefix << p_exemplar_prefix
+	.base_exemplar << p_base_exemplar
+	.types << equality_hash_table.new()
+	.anonymous_types << set.new()
+	
+	_return _self
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_method xsd_loader.generate()
+	##
+	_self.parse_simple_types()
+	_self.parse_complex_types()
+	_self.set_field_types_type()
+	_self.move_types_to_target_package()
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_private _method xsd_loader.parse_simple_types()
+	##
+	l_root << .xsd.top_element
+	_for i_child _over l_root.get_elements({:|xs:simpleType|, :any})
+	_loop
+		_self.generate_named_simple_type(i_child)
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_private _method xsd_loader.parse_complex_types()
+	##
+	l_root << .xsd.top_element
+	_for i_child _over l_root.get_elements({:|xs:complexType|, :any})
+	_loop
+		_self.generate_named_complex_type(i_child)
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_private _method xsd_loader.generate_named_simple_type(p_type)
+	##
+	l_name << p_type.attribute(:name)
+	l_type_name << _self.generate_exemplar_name(l_name)
+	
+	# get base type
+	l_restriction << p_type.get_element(:|xs:restriction|)
+	l_base_type << l_restriction.attribute(:base)
+	
+	# build restriction
+	l_restrictions << _self.parse_restrictions(l_restriction)
+	
+	# create restriction exemplar
+	l_base_types << _if .base_exemplar _isnt _unset
+			_then
+				>> {@xsd_loader:xsd_simple_type, .base_exemplar}
+			_else
+				>> {@xsd_loader:xsd_simple_type}
+			_endif
+	_block
+		_handling conflict_methods _with _self.method_conflict_resolver(.base_exemplar)
+		l_type << def_slotted_exemplar(l_type_name, {}, l_base_types)
+	_endblock
+	l_type.define_shared_constant(:xsd_type_name, l_name, :public)
+	l_type.define_shared_constant(:xsd_type, p_type, :public)  # XXX DEBUG
+	l_type.define_shared_constant(:xsd_base_type, l_base_type, :public)
+	l_type.define_shared_constant(:xsd_restrictions, l_restrictions, :public)
+	.types[l_name] << l_type
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_private _method xsd_loader.parse_restrictions(p_restriction)
+	l_restrictions << set.new()
+	
+	# XXX TODO: restriction for base type?
+	
+	_for i_child _over p_restriction.get_elements({:|xs:enumeration|, :any})
+	_loop
+		l_value << i_child.attribute(:value)
+		l_restriction << xsd_restriction_enumeration.new(l_value)
+		l_restrictions.add(l_restriction)
+	_endloop
+	
+	_for i_child _over p_restriction.get_elements({:|xs:pattern|, :any})
+	_loop
+		l_value << i_child.attribute(:value)
+		l_restriction << xsd_restriction_pattern.new(l_value)
+		l_restrictions.add(l_restriction)
+	_endloop
+	
+	_return l_restrictions
+_endmethod
+$
+
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_private _method xsd_loader.generate_anonymous_simple_type(p_type)
+	##
+	l_type_name << :anonymous_type_ + (.anonymous_types.size + 1).write_string
+	
+	# get base type
+	l_restriction << p_type.get_element(:|xs:restriction|)
+	l_base_type << l_restriction.attribute(:base)
+	
+	# build restriction
+	l_restrictions << _self.parse_restrictions(l_restriction)
+	
+	# create restriction exemplar
+	l_base_types << _if .base_exemplar _isnt _unset
+			_then
+				>> {@xsd_loader:xsd_simple_type, .base_exemplar}
+			_else
+				>> {@xsd_loader:xsd_simple_type}
+			_endif
+	_block
+		_handling conflict_methods _with _self.method_conflict_resolver(.base_exemplar)
+		l_type << def_slotted_exemplar(l_type_name, {}, l_base_types)
+	_endblock
+	l_type.define_shared_constant(:xsd_type_name, _unset, :public)
+	l_type.define_shared_constant(:xsd_type, p_type, :public)  # XXX DEBUG
+	l_type.define_shared_constant(:xsd_base_type, l_base_type, :public)
+	l_type.define_shared_constant(:xsd_restrictions, l_restrictions, :public)
+	.anonymous_types.add(l_type)
+	_return l_type
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_private _method xsd_loader.generate_named_complex_type(p_type)
+	##
+	l_name << p_type.attribute(:name)
+	_if .types[l_name] _isnt _unset _then _return _endif
+	
+	l_type_name << _self.generate_exemplar_name(l_name)
+	l_slots << rope.new()
+	l_base_classes << rope.new()
+	l_field_types << property_list.new()
+	
+	# special case: inheritance
+	# XXX TODO: refactor to own method
+	_for i_child _over p_type.find_elements(:|xs:extension|)
+	_loop
+		# generate parent type first
+		l_base_name << i_child.attribute(:base)
+		l_base_type << .xsd.top_element.get_element({:|xs:complexType|, :name, l_base_name})
+		_self.generate_named_complex_type(l_base_type)
+		
+		# copy field types
+		l_base_class << .types[l_base_name]
+		l_field_types.add_all(l_base_class.field_types)
+		
+		# add to inheritance table
+		l_base_classes.add(l_base_class.class_name)
+	_endloop
+	_if l_base_classes.empty?
+	_then
+		l_base_classes.add(@xsd_loader:xsd_complex_type)
+		_if .base_exemplar _isnt _unset
+		_then
+			l_base_classes.add(.base_exemplar)
+		_endif
+	_endif
+	
+	# gather elements
+	# XXX TODO: refactor to own method
+	_for i_child _over p_type.find_elements(:|xs:element|)
+	_loop
+		# XXX TODO: in case of a xs:choice, then we need to extract the
+		# min/maxOccurs from the xs:choice, not from the xs:element
+		
+		(l_el_name, l_props, l_slot) << _self.parse_complex_type_element(i_child)
+		_if l_el_name _is _unset
+		_then
+			_continue
+		_endif
+		l_field_types[l_el_name] << l_props
+		l_slots.add(l_slot)
+	_endloop
+	
+	# gather choices, overwriting elements
+	_for i_choice _over p_type.find_elements(:|xs:choice|)
+	_loop
+		_for i_child _over p_type.find_elements(:|xs:element|)
+		_loop
+			# XXX TODO
+		_endloop
+	_endloop
+	
+	# create slotted exemplar
+	l_slots << l_slots.as_simple_vector()
+	l_base_classes << l_base_classes.as_simple_vector()
+	_local l_base_exemplar << .base_exemplar
+	_block
+		_handling conflict_methods _with _self.method_conflict_resolver(.base_exemplar)
+		l_type << def_slotted_exemplar(l_type_name, l_slots, l_base_classes)
+	_endblock
+	l_type.define_shared_constant(:xsd_type_name, l_name, :public)
+	l_type.define_shared_constant(:xsd_type, p_type, :public)  # XXX DEBUG
+	l_type.define_shared_constant(:field_types, l_field_types, :public)
+	_self.define_get_methods(l_type)
+	_self.define_set_methods(l_type)
+	.types[l_name] << l_type
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_private _method xsd_loader.method_conflict_resolver(p_base_exemplar)
+	##
+	_return _proc @auto_conflict_resolver(cond)
+			_import p_base_exemplar
+			l_data << property_list.new_from_gathered(cond.data)  # propertize cond.data, as this is not done yet
+			_for i_method _over l_data[:methods].fast_elements()
+			_loop
+				_if xsd_complex_type.define_method_target.local_method?(i_method.name)
+				_then
+					# does_not_understand()
+					i_method.owner.resolve_conflicts(:xsd_complex_type, {i_method.name})
+				_elif p_base_exemplar _isnt _unset _andif
+				      p_base_exemplar.define_method_target.responds_to?(i_method.name)
+				_then
+					i_method.owner.resolve_conflicts(p_base_exemplar.value.class_name, {i_method.name})
+				_endif
+			_endloop
+		_endproc
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_private _method xsd_loader.define_get_methods(p_type)
+	_for i_child_name, i_props _over p_type.field_types.fast_keys_and_elements()
+	_loop
+		l_proc << _proc()
+				  _import i_child_name
+				  _return _self.retrieve(i_child_name)
+			  _endproc
+		p_type.define_method(i_child_name, l_proc, _false)
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_private _method xsd_loader.define_set_methods(p_type)
+	_for i_child_name, i_props _over p_type.field_types.fast_keys_and_elements()
+	_loop
+		l_proc << _proc(p_value)
+				  _import i_child_name
+				  _return _self.assign(i_child_name, p_value)
+			  _endproc
+		p_type.define_method(i_child_name.with_chevron, l_proc, _false)
+		
+		l_proc << _proc(p_value)
+				  _import i_child_name
+				  l_old_value << _self.retrieve(i_child_name)
+				  _self.assign(i_child_name, p_value)
+				  _return l_old_value
+			  _endproc
+		p_type.define_method(i_child_name.with_boot_chevron, l_proc, _false)
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_private _method xsd_loader.parse_complex_type_element(p_element, _optional p_min_occurs, p_max_occurs)
+	##
+	l_el_min_occurs << p_min_occurs.default(p_element.attribute(:|minOccurs|).default("1"))
+	l_el_max_occurs << p_max_occurs.default(p_element.attribute(:|maxOccurs|).default("1"))
+	l_el_name       << p_element.attribute(:name)
+	l_el_type_name  << p_element.attribute(:type)
+	l_el_ref        << p_element.attribute(:ref)
+	
+	_if l_el_name _is _unset _andif
+	    l_el_ref _is _unset
+	_then
+		condition.raise(:xsd_loader_error, :string, write_string("Do not know what to do with complex_type element: ", p_element))
+		_return _unset, _unset
+	_endif
+	
+	# nested (unnamed) types
+	l_anon_simple_type << p_element.find_element(:|xs:simpleType|)
+	l_type << _if l_anon_simple_type _isnt _unset
+		  _then
+			  >> _self.generate_anonymous_simple_type(l_anon_simple_type)
+		  _endif
+	
+	_if l_el_ref _isnt _unset
+	_then
+		# find referenced element
+		l_root << .xsd.top_element
+		l_reffed_el << l_root.get_element({:|xs:element|, :name, l_el_ref})
+		
+		l_el_name << l_reffed_el.attribute(:name)
+		l_el_type_name << l_reffed_el.attribute(:type)
+	_endif
+	
+	l_el_name << _self.generate_slot_name(l_el_name).as_symbol()
+	l_props << property_list.new_with(
+			   :type, l_type,
+			   :xsd_name, l_el_name,
+			   :xsd_type_name, l_el_type_name,
+			   :min_occurs, l_el_min_occurs,
+			   :max_occurs, l_el_max_occurs,
+			   :ref, l_el_ref)
+	l_slot_def << {l_el_name, _unset}
+	
+	_return	l_el_name, l_props, l_slot_def
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_private _method xsd_loader.set_field_types_type()
+	##
+	_for i_type _over .types.fast_elements()
+	_loop
+		_if _not i_type.is_kind_of?(xsd_complex_type)
+		_then
+			_continue
+		_endif
+		
+		_for i_field_name, i_props _over i_type.field_types.fast_keys_and_elements()
+		_loop
+			_if (l_type_name << i_props[:xsd_type_name]) _isnt _unset _andif
+			    (l_magik_type << .types[l_type_name]) _isnt _unset
+			_then
+				i_props[:type] << l_magik_type
+			_endif
+		_endloop
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_method xsd_loader.move_types_to_target_package()
+	##
+	_for i_type _over .types.fast_elements()
+	_loop
+		l_type_name << i_type.class_name
+		_self.move_type_target_package(l_type_name)
+	_endloop
+	_for i_type _over .anonymous_types.fast_elements()
+	_loop
+		l_type_name << i_type.class_name
+		_self.move_type_target_package(l_type_name)
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_private _method xsd_loader.generate_exemplar_name(p_name)
+	##
+	l_prefix << .exemplar_prefix.default("")
+	l_snake_case << p_name.write_string.as_snake_case()
+	l_snake_case << write_string(l_prefix, l_snake_case)
+	_return l_snake_case.as_symbol()
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_private _method xsd_loader.generate_slot_name(p_name)
+	##
+	l_snake_case << p_name.write_string.as_snake_case()
+	_return l_snake_case.as_symbol()
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_private _method xsd_loader.move_type_target_package(p_type_name)
+	##
+	_if !current_package!.name <> .target_package.name
+	_then
+		l_type << !current_package![p_type_name]
+		!current_package!.remove_key(p_type_name)
+		.target_package[p_type_name] << l_type
+		
+		l_gv << global_variable.new(p_type_name, l_type, _true, .target_package)
+		l_type.method_table.metadata[:exemplar_global] << l_gv
+	_endif
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_method xsd_loader.load_xml_from_file(p_filename)
+	##
+	l_xml << simple_xml.read_document_file(p_filename)
+	
+	# parse XML, transforming elements to objects
+	_return _self.load_xml_thing(l_xml.top_element)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_method xsd_loader.load_xml_from_string(p_xml_string)
+	l_xml << simple_xml.read_document_string(p_filename)
+	
+	# parse XML, transforming elements to objects
+	_return _self.load_xml_thing(l_xml.top_element)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_private _method xsd_loader.load_xml_thing(p_xml_thing, _optional p_magik_type)
+	##
+	# get target type
+	l_magik_type << _if p_magik_type _isnt _unset
+			_then
+				>> p_magik_type
+			_else
+				>> .types[p_xml_thing.xml_tag]
+			_endif
+	
+	# parse children
+	l_props << property_list.new()
+	_for i_xml_child _over p_xml_thing.xml_elements.fast_elements()
+	_loop
+		(l_child_name, l_child) << _self.parse_xml_child(i_xml_child, l_magik_type)
+		
+		_if l_props[l_child_name] _is _unset
+		_then
+			l_props[l_child_name] << rope.new()
+		_endif
+		l_props[l_child_name].add_last(l_child)
+	_endloop
+	
+	# instantiate object
+	_return l_magik_type.new(l_props)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_private _method xsd_loader.parse_xml_child(p_xml_child, p_parent_type)
+	##
+	l_child_name << _self.generate_slot_name(p_xml_child.xml_tag).as_symbol()
+	l_child_field_type << p_parent_type.field_types[l_child_name]
+	l_child_magik_type << l_child_field_type[:type]
+	l_child << _if l_child_magik_type _is _unset
+		   _then
+			   >> p_xml_child.xml_contents
+		   _elif l_child_magik_type.is_kind_of?(xsd_simple_type)
+		   _then
+			   >> l_child_magik_type.new(p_xml_child.xml_contents)
+		   _elif l_child_magik_type.is_kind_of?(xsd_complex_type)
+		   _then
+			   >> _self.load_xml_thing(p_xml_child, l_child_magik_type)
+		   _endif
+	
+	_return l_child_name, l_child
+_endmethod
+$

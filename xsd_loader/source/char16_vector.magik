@@ -1,0 +1,28 @@
+_package user
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_method char16_vector.as_snake_case()
+	_if _self.size < 2
+	_then
+		_return _self.lowercase
+	_endif
+	
+	l_str << _self
+	l_re <<  ole_client.createobject("vbscript.regexp")
+	l_re.global << 1
+	
+	l_re.pattern << "([A-Z]+)([A-Z][a-z])"
+	l_str << l_re.replace(l_str, "$1_$2")
+	
+	l_re.pattern << "([a-z\d])([A-Z])"
+	l_str << l_re.replace(l_str, "$1_$2")
+	
+	l_re.pattern << "-"
+	l_str << l_re.replace(l_str, "_")
+	
+	l_re.pattern << "__"
+	l_str << l_re.replace(l_str, "_")
+	
+	_return l_str.lowercase
+_endmethod
+$

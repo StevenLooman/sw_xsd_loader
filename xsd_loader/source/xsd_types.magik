@@ -1,0 +1,284 @@
+_package xsd_loader
+
+_block
+	remex(:xsd_type)
+	remex(:xsd_simple_type)
+	remex(:xsd_restriction_enumeration)
+	remex(:xsd_restriction_pattern)
+	remex(:xsd_complex_type)
+_endblock
+$
+
+def_slotted_exemplar(
+	:xsd_type,
+	{})
+$
+
+def_slotted_exemplar(
+	:xsd_simple_type,
+	{
+		{:value, _unset, :readable, :public}
+	},
+	:xsd_type)
+$
+
+def_slotted_exemplar(
+	:xsd_restriction_enumeration,
+	{
+		{:value, _unset, :readable, :public}
+	})
+$
+
+def_slotted_exemplar(
+	:xsd_restriction_pattern,
+	{
+		{:pattern, _unset, :readable, :public}
+	})
+$
+
+def_slotted_exemplar(
+	:xsd_complex_type,
+	{},
+	{:xsd_type})
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_method xsd_type.valid_value?(p_value, _optional p_child_name)
+	##
+	_return _true
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_method xsd_complex_type.new(p_children)
+	##
+	_return _clone.init(p_children)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_private _method xsd_complex_type.init(p_children)
+	##
+	_for i_key, i_value _over p_children.fast_keys_and_elements()
+	_loop
+		_self.assign(i_key, i_value)
+	_endloop
+	_return _self
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_private _method xsd_complex_type.assign(p_child_name, p_value)
+	##
+	_if _not p_value.is_kind_of?(rope)
+	_then
+		p_value << rope.new_with(p_value)
+	_endif
+	
+	_if (l_field_type << _self.field_types[p_child_name]) _is _unset
+	_then
+		condition.raise(:xsd_loader_no_such_field, :string, write_string(_self.class_name, " has no field ", p_child_name))
+	_endif
+	
+	# autoboxing
+	_for i_idx _over p_value.fast_keys()
+	_loop
+		p_value[i_idx] << _self.autobox_value(l_field_type, p_value[i_idx])
+	_endloop
+	
+	# type validation
+	_for i_value _over p_value.fast_elements()
+	_loop
+		_if _not _self.valid_value?(i_value, p_child_name)
+		_then
+			condition.raise(:xsd_loader_invalid_value_for_field, :string, write_string("Invalid value for field ", p_child_name))
+		_endif
+	_endloop
+	
+	# XXX TODO: count validation
+	
+	_return _self.sys!slot(p_child_name) << p_value
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_method xsd_complex_type.autobox_value(p_field_type, p_value)
+	##
+	# XXX TODO: should always autobox?
+	
+	_if (l_magik_type << p_field_type[:type]) _isnt _unset _andif
+	    l_magik_type.is_kind_of?(xsd_simple_type) _andif
+	    _not p_value.is_kind_of?(l_magik_type)# _andif
+	    #l_magik_type.valid_value?(p_value)
+	_then
+		_return l_magik_type.new(p_value)
+	_endif
+	_return p_value
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_method xsd_complex_type.valid_value?(p_value, _optional p_child_name)
+	##
+	l_field_type << _self.field_types[p_child_name]
+	
+	# check type of value
+	_if (l_type << l_field_type[:type]) _isnt _unset _andif
+	    _not p_value.is_kind_of?(l_type)
+	_then
+		_return _false
+	_endif
+	
+	_return _true
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_private _method xsd_complex_type.retrieve(p_child_name, _optional p_keep_container?)
+	##
+	l_field_type << _self.field_types[p_child_name]
+	l_value << _self.sys!slot(p_child_name).default({})
+	
+	_if p_keep_container? _isnt _true _andif
+	    l_field_type[:type].is_kind_of?(xsd_simple_type)
+	_then
+		l_value << l_value.map(_proc(v) _return v.value _endproc)
+	_endif
+	
+	_if l_field_type[:max_occurs] = "1"
+	_then
+		l_value << l_value.an_element()
+	_endif
+	
+	_return l_value
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_method xsd_complex_type.print_on(p_stream)
+	##
+	l_children << _self.field_types.keys
+	l_ex << _self.exemplar_global
+	p_stream.write(l_ex.package.name, %:, l_ex.key, newline_char)
+	_for i_child_name _over l_children.fast_elements()
+	_loop
+		l_value << _self.retrieve(i_child_name)
+		p_stream.write(i_child_name, tab_char, l_value, newline_char)
+	_endloop
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_method xsd_simple_type.new(p_value)
+	##
+	_return _clone.init(p_value)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_private _method xsd_simple_type.init(p_value)
+	##
+	_self.value << _self.convert_value(p_value)
+	_return _self
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_method xsd_simple_type.value<< p_value
+	##
+	_if _not _self.valid_value?(p_value)
+	_then
+		condition.raise(:xsd_loader_invalid_value_for_field, :string, write_string("Invalid value ", p_value))
+	_endif
+	.value << p_value
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_method xsd_simple_type.valid_value?(p_value)
+	_if _self.xsd_restrictions.empty?
+	_then
+		_return _true
+	_endif
+	
+	_for i_restriction _over _self.xsd_restrictions.fast_elements()
+	_loop
+		_if i_restriction.valid_value?(p_value)
+		_then
+			_return _true
+		_endif
+	_endloop
+	_return _false
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_method xsd_simple_type.convert_value(p_value)
+	##
+	l_xsd_type << _self.xsd_base_type
+	_if l_xsd_type = "xs:date"
+	_then
+		_return date.new_from_string(p_value, "#Y-#m-#d")
+	_elif l_xsd_type = "xs:boolean"
+	_then
+		_constant l_map << equality_property_list.new_with(
+					   "true",  _true,
+					   "1",     _true,
+					   "false", _false,
+					   "0",     _false)
+		_return l_map[p_value]
+	_elif l_xsd_type = "xs:int"
+	_then
+		_return p_value.as_number()
+	_elif l_xsd_type = "xs:string"
+	_then
+		_return p_value
+	_endif
+	_return p_value
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_method xsd_restriction_enumeration.new(p_value)
+	_return _clone.init(p_value)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_private _method xsd_restriction_enumeration.init(p_value)
+	##
+	.value << p_value
+	_return _self
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_method xsd_restriction_enumeration.valid_value?(p_value)
+	##
+	_return .value = p_value
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_method xsd_restriction_pattern.new(p_pattern)
+	##
+	_return _clone.init(p_pattern)
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_private _method xsd_restriction_pattern.init(p_pattern)
+	.pattern << p_pattern
+	_return _self
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_method xsd_restriction_pattern.valid_value?(p_value)
+	l_re <<  ole_client.createobject("vbscript.regexp")
+	l_re.pattern << .pattern
+	l_ok? << l_re.test(p_value)
+	l_re.release_object()
+	_return l_ok?
+_endmethod
+$

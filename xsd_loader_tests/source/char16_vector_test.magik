@@ -1,0 +1,32 @@
+_package user
+$
+
+def_slotted_exemplar(
+	:char16_vector_test,
+	{},
+	{:test_case})
+$
+
+_pragma(classify_level=debug, topic={xsd_loader})
+_method char16_vector_test.test_camel_case_1()
+	l_in << "CamelCase"
+	l_out << l_in.as_snake_case()
+	_self.assert(l_out, :|=|, "camel_case")
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={xsd_loader})
+_method char16_vector_test.test_camel_case_2()
+	l_in << "ABBRNormal"
+	l_out << l_in.as_snake_case()
+	_self.assert(l_out, :|=|, "abbr_normal")
+_endmethod
+$
+
+_pragma(classify_level=debug, topic={xsd_loader})
+_method char16_vector_test.test_camel_case_3()
+	l_in << "With_Underscore"
+	l_out << l_in.as_snake_case()
+	_self.assert(l_out, :|=|, "with_underscore")
+_endmethod
+$

@@ -1,0 +1,23 @@
+xsd_loader_tests	1
+
+description
+	XSD Loader Tests
+end
+
+requires
+	xsd_loader
+	munit_base
+end
+
+tests_modules
+	xsd_loader
+end
+
+test
+	name		xsd_loader_tests
+	framework	munit
+	args 		xsd_loader_tests
+end
+
+hidden
+language en_gb

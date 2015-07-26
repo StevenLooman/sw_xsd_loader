@@ -1,0 +1,10 @@
+test/
+
+.svn/
+
+*.magikc
+*.msgc
+
+*.swp
+*~
+\#*\#
