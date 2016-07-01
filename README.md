@@ -14,4 +14,4 @@ This module was written with supporting one project in mind. Not everything desc
 License
 -------
 
-sw_http_server is licensed under the GPLv3 license. It is written by [Steven Looman](mailto:steven.looman@gmail.com).
+sw\_xsd\_loader is licensed under the GPLv3 license. It is written by [Steven Looman](mailto:steven.looman@gmail.com).
