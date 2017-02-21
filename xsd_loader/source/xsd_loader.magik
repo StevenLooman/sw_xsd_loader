@@ -451,6 +451,7 @@ $
 _pragma(classify_level=basic, topic={xsd_loader, xsd})
 _private _method xsd_loader.move_type_target_package(p_type_name)
 	##
+	_dynamic !current_package!
 	_if !current_package!.name <> .target_package.name
 	_then
 		l_type << !current_package![p_type_name]
