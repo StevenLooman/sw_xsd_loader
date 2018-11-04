@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns="http://www.w3.org/2001/XMLSchema"
+	   xmlns:xs="http://www.w3.org/2001/XMLSchema"
+	   targetNamespace="urn:xsd_loader_test" xmlns:tns="urn:xsd_loader_test">
+  <xs:simpleType name="St1">
+    <xs:restriction base="xs:string" />
+  </xs:simpleType>
+  <xs:complexType name="Ct3" >
+    <xs:sequence>
+      <xs:element name="e1" type="St1" />
+    </xs:sequence>
+  </xs:complexType>
+</xs:schema>

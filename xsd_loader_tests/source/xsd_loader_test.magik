@@ -7,193 +7,68 @@ def_slotted_exemplar(
 	{:test_case})
 $
 
-_pragma(classify_level=debug, topic={xsd_loader})
+_pragma(classify_level=base, topic={xsd_loader})
+_private _method xsd_loader_test.fixture_path(p_filename)
+	module_name << _self.module_name
+	module << sw_module_manager.module(module_name)
+	_return module.get_resource_file(p_filename, "data/fixtures")
+_endmethod
+$
+
+_pragma(classify_level=unit_test, topic={xsd_loader})
 _method xsd_loader_test.set_up()
-	##
 	def_package(:xsd_loader_test)
 _endmethod
 $
 
-_pragma(classify_level=debug, topic={xsd_loader})
+_pragma(classify_level=unit_test, topic={xsd_loader})
 _method xsd_loader_test.tear_down()
-	##
 	package.all_packages.remove_key(:xsd_loader_test)
 _endmethod
 $
 
-_pragma(classify_level=debug, topic={xsd_loader})
+_pragma(classify_level=unit_test, topic={xsd_loader})
 _method xsd_loader_test.test_simple_type_definition_1()
-	##
-	xsd << write_string(
-		       "<xs:schema>",
-		       write_string("<xs:simpleType name=", %", "St1", %", ">"),
-		       write_string("<xs:restriction base=", %", "xs:string", %", " />"),
-		       "</xs:simpleType>",
-		       "</xs:schema>"
-	       )
-	loader << xsd_loader:xsd_loader.new_from_string(xsd, :xsd_loader_test)
-	loader.generate()
+	filename << _self.fixture_path("simple_type_definition_1.xsd")
+	loader << xsd_loader:xsd_loader_factory.generate_loader(filename, :target_package, :xsd_loader_test)
+	filename << _self.fixture_path("simple_type_definition_1.xml")
+	obj << loader.load_xml_from_file(filename)
 	
-	# ensure a type is created
-	_self.assert(loader.types.includes_key?("St1"), :|=|, _true)
-	_self.assert(get_global_value(:|xsd_loader_test:st1|), :|~=|, _unset)
+	_self.assert(obj, :|~=|, _unset)
 _endmethod
 $
 
-_pragma(classify_level=debug, topic={xsd_loader})
+_pragma(classify_level=unit_test, topic={xsd_loader})
 _method xsd_loader_test.test_complex_type_definition_1()
-	##
-	xsd << write_string(
-		       "<xs:schema>",
-		       write_string("<xs:complexType name=", %", "Ct1", %", " />"),
-		       "</xs:schema>"
-	       )
-	loader << xsd_loader:xsd_loader.new_from_string(xsd, :xsd_loader_test)
-	loader.generate()
+	filename << _self.fixture_path("complex_type_definition_1.xsd")
+	loader << xsd_loader:xsd_loader_factory.generate_loader(filename, :target_package, :xsd_loader_test)
+	filename << _self.fixture_path("complex_type_definition_1.xml")
+	obj << loader.load_xml_from_file(filename)
 	
-	# ensure a type is created
-	_self.assert(loader.types.includes_key?("Ct1"), :|=|, _true)
-	_self.assert(get_global_value(:|xsd_loader_test:ct1|), :|~=|, _unset)
+	_self.assert(obj, :|~=|, _unset)
 _endmethod
 $
 
-_pragma(classify_level=debug, topic={xsd_loader})
+_pragma(classify_level=unit_test, topic={xsd_loader})
 _method xsd_loader_test.test_complex_type_definition_2()
-	##
-	xsd << write_string(
-		       "<xs:schema>",
-		       write_string("<xs:complexType name=", %", "Ct2", %", " >"),
-		       "<xs:sequence>",
-		       write_string("<xs:element name=", %", "e1", %", " type=", %", "xs:string", %", " />"),
-		       "</xs:sequence>",
-		       "</xs:complexType>",
-		       "</xs:schema>"
-	       )
-	loader << xsd_loader:xsd_loader.new_from_string(xsd, :xsd_loader_test)
-	loader.generate()
+	filename << _self.fixture_path("complex_type_definition_2.xsd")
+	loader << xsd_loader:xsd_loader_factory.generate_loader(filename, :target_package, :xsd_loader_test)
+	filename << _self.fixture_path("complex_type_definition_2.xml")
+	obj << loader.load_xml_from_file(filename)
 	
-	# ensure a type is created
-	_self.assert(loader.types["Ct2"], :|~=|, _unset)
-	type << get_global_value(:|xsd_loader_test:ct2|)
-	_self.assert(type, :|~=|, _unset)
-	
-	# ensure type has field e1
-	field_type << property_list.new_with(:type, _unset,
-					     :xsd_name, :e1,
-					     :xsd_type_name, "xs:string",
-					     :min_occurs, "1",
-					     :max_occurs, "1",
-					     :ref, _unset)
-	_self.assert(type.field_types[:e1], :|assert_equals?()|, field_type)
+	_self.assert(obj, :|~=|, _unset)
+	_self.assert(obj.e1, :|=|, "test_element")
 _endmethod
 $
 
-_pragma(classify_level=debug, topic={xsd_loader})
+_pragma(classify_level=unit_test, topic={xsd_loader})
 _method xsd_loader_test.test_complex_type_definition_3()
-	##
-	xsd << write_string(
-		       "<xs:schema>",
-		       write_string("<xs:simpleType name=", %", "St1", %", ">"),
-		       write_string("<xs:restriction base=", %", "xs:string", %", " />"),
-		       "</xs:simpleType>",
-		       write_string("<xs:complexType name=", %", "Ct2", %", " >"),
-		       "<xs:sequence>",
-		       write_string("<xs:element name=", %", "e1", %", " type=", %", "St1", %", " />"),
-		       "</xs:sequence>",
-		       "</xs:complexType>",
-		       "</xs:schema>"
-	       )
-	loader << xsd_loader:xsd_loader.new_from_string(xsd, :xsd_loader_test)
-	loader.generate()
+	filename << _self.fixture_path("complex_type_definition_3.xsd")
+	loader << xsd_loader:xsd_loader_factory.generate_loader(filename, :target_package, :xsd_loader_test)
+	filename << _self.fixture_path("complex_type_definition_3.xml")
+	obj << loader.load_xml_from_file(filename)
 	
-	# ensure a type is created
-	_self.assert(loader.types["Ct2"], :|~=|, _unset)
-	type << get_global_value(:|xsd_loader_test:ct2|)
-	_self.assert(type, :|~=|, _unset)
-	
-	# ensure type has field e1
-	_self.assert(type.field_types[:e1], :|~=|, _unset)
-_endmethod
-$
-
-_pragma(classify_level=debug, topic={xsd_loader})
-_method xsd_loader_test.test_xsd_restriction_enumeration_1()
-	xsd << write_string(
-		       "<xs:schema>",
-		       write_string("<xs:simpleType name=", %", "Re1", %", ">"),
-		       write_string("<xs:restriction base=", %", "xs:string", %", ">"),
-		       write_string("<xs:enumeration value=", %", "e1", %", "/>"),
-		       "</xs:restriction>",
-		       "</xs:simpleType>",
-		       "</xs:schema>"
-	       )
-	loader << xsd_loader:xsd_loader.new_from_string(xsd, :xsd_loader_test)
-	loader.generate()
-	type << loader.types["Re1"]
-	
-	# ensure it validates valid values
-	instance << type.new("e1")
-	_self.assert(instance, :|~=|, _unset)
-_endmethod
-$
-
-_pragma(classify_level=debug, topic={xsd_loader})
-_method xsd_loader_test.test_xsd_restriction_enumeration_2()
-	xsd << write_string(
-		       "<xs:schema>",
-		       write_string("<xs:simpleType name=", %", "Re2", %", ">"),
-		       write_string("<xs:restriction base=", %", "xs:string", %", ">"),
-		       write_string("<xs:enumeration value=", %", "e1", %", "/>"),
-		       "</xs:restriction>",
-		       "</xs:simpleType>",
-		       "</xs:schema>"
-	       )
-	loader << xsd_loader:xsd_loader.new_from_string(xsd, :xsd_loader_test)
-	loader.generate()
-	type << loader.types["Re2"]
-	
-	# ensure it give a warning on invalid values
-	_self.assert_raised_condition(:xsd_loader_invalid_value_for_field, type, :|new()|, {"x1"})
-_endmethod
-$
-
-_pragma(classify_level=debug, topic={xsd_loader})
-_method xsd_loader_test.test_xsd_restriction_pattern_1()
-	xsd << write_string(
-		       "<xs:schema>",
-		       write_string("<xs:simpleType name=", %", "Rp1", %", ">"),
-		       write_string("<xs:restriction base=", %", "xs:string", %", ">"),
-		       write_string("<xs:pattern value=", %", "[a-z]+", %", "/>"),
-		       "</xs:restriction>",
-		       "</xs:simpleType>",
-		       "</xs:schema>"
-	       )
-	loader << xsd_loader:xsd_loader.new_from_string(xsd, :xsd_loader_test)
-	loader.generate()
-	type << loader.types["Rp1"]
-	
-	# ensure it validates valid values
-	instance << type.new("test")
-	_self.assert(instance, :|~=|, _unset)
-_endmethod
-$
-
-_pragma(classify_level=debug, topic={xsd_loader})
-_method xsd_loader_test.test_xsd_restriction_pattern_2()
-	xsd << write_string(
-		       "<xs:schema>",
-		       write_string("<xs:simpleType name=", %", "Rp2", %", ">"),
-		       write_string("<xs:restriction base=", %", "xs:string", %", ">"),
-		       write_string("<xs:pattern value=", %", "[a-z]+", %", "/>"),
-		       "</xs:restriction>",
-		       "</xs:simpleType>",
-		       "</xs:schema>"
-	       )
-	loader << xsd_loader:xsd_loader.new_from_string(xsd, :xsd_loader_test)
-	loader.generate()
-	type << loader.types["Rp2"]
-	
-	# ensure it validates valid values
-	_self.assert_raised_condition(:xsd_loader_invalid_value_for_field, type, :|new()|, {"123"})
+	_self.assert(obj, :|~=|, _unset)
+	_self.assert(obj.e1, :|=|, "test_element")
 _endmethod
 $

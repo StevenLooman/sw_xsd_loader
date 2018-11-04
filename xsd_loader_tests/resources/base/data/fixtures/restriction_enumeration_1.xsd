@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns="http://www.w3.org/2001/XMLSchema"
+	   xmlns:xs="http://www.w3.org/2001/XMLSchema"
+	   targetNamespace="urn:xsd_loader_test" xmlns:tns="urn:xsd_loader_test">
+  <xs:simpleType name="Re1">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="e1" />
+    </xs:restriction>
+  </xs:simpleType>
+</xs:schema>

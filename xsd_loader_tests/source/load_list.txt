@@ -1,3 +1,4 @@
 sw_extras
 char16_vector_test
+xsd_loader_factory_test
 xsd_loader_test

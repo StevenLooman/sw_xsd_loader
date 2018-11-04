@@ -4,3 +4,4 @@ simple_xml_thing
 char16_vector
 xsd_types
 xsd_loader
+xsd_loader_factory

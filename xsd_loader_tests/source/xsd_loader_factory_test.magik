@@ -1,0 +1,133 @@
+_package user
+$
+
+def_slotted_exemplar(
+	:xsd_loader_factory_test,
+	{},
+	{:test_case})
+$
+
+_pragma(classify_level=base, topic={xsd_loader})
+_private _method xsd_loader_factory_test.fixture_path(p_filename)
+	module_name << _self.module_name
+	module << sw_module_manager.module(module_name)
+	_return module.get_resource_file(p_filename, "data/fixtures")
+_endmethod
+$
+
+_pragma(classify_level=unit_test, topic={xsd_loader})
+_method xsd_loader_factory_test.set_up()
+	def_package(:xsd_loader_test)
+_endmethod
+$
+
+_pragma(classify_level=unit_test, topic={xsd_loader})
+_method xsd_loader_factory_test.tear_down()
+	package.all_packages.remove_key(:xsd_loader_test)
+_endmethod
+$
+
+_pragma(classify_level=unit_test, topic={xsd_loader})
+_method xsd_loader_factory_test.test_simple_type_definition_1()
+	filename << _self.fixture_path("simple_type_definition_1.xsd")
+	loader << xsd_loader:xsd_loader_factory.generate_loader(filename, :target_package, :xsd_loader_test)
+	
+	# ensure a type is created
+	_self.assert(loader.types.includes_key?({"urn:xsd_loader_test", "St1"}), :|=|, _true)
+	_self.assert(get_global_value(:|xsd_loader_test:st1|), :|~=|, _unset)
+_endmethod
+$
+
+_pragma(classify_level=unit_test, topic={xsd_loader})
+_method xsd_loader_factory_test.test_complex_type_definition_1()
+	filename << _self.fixture_path("complex_type_definition_1.xsd")
+	loader << xsd_loader:xsd_loader_factory.generate_loader(filename, :target_package, :xsd_loader_test)
+	
+	# ensure a type is created
+	_self.assert(loader.types.includes_key?({"urn:xsd_loader_test", "Ct1"}), :|=|, _true)
+	_self.assert(get_global_value(:|xsd_loader_test:ct1|), :|~=|, _unset)
+_endmethod
+$
+
+_pragma(classify_level=unit_test, topic={xsd_loader})
+_method xsd_loader_factory_test.test_complex_type_definition_2()
+	filename << _self.fixture_path("complex_type_definition_2.xsd")
+	loader << xsd_loader:xsd_loader_factory.generate_loader(filename, :target_package, :xsd_loader_test)
+	
+	# ensure a type is created
+	_self.assert(loader.types[{"urn:xsd_loader_test", "Ct2"}], :|~=|, _unset)
+	type << get_global_value(:|xsd_loader_test:ct2|)
+	_self.assert(type, :|~=|, _unset)
+	
+	# ensure type has field e1
+	field_type << property_list.new_with(:type, _unset,
+					     :xsd_namespace, "urn:xsd_loader_test",
+					     :xsd_name, :e1,
+					     :xsd_type_name, "xs:string",
+					     :min_occurs, "1",
+					     :max_occurs, "1",
+					     :ref, _unset)
+	_self.assert(type.field_types[:e1], :|assert_equals?()|, field_type)
+_endmethod
+$
+
+_pragma(classify_level=unit_test, topic={xsd_loader})
+_method xsd_loader_factory_test.test_complex_type_definition_3()
+	filename << _self.fixture_path("complex_type_definition_3.xsd")
+	loader << xsd_loader:xsd_loader_factory.generate_loader(filename, :target_package, :xsd_loader_test)
+	
+	# ensure a type is created
+	_self.assert(loader.types[{"urn:xsd_loader_test", "Ct3"}], :|~=|, _unset)
+	type << get_global_value(:|xsd_loader_test:ct3|)
+	_self.assert(type, :|~=|, _unset)
+	
+	# ensure type has field e1
+	_self.assert(type.field_types[:e1], :|~=|, _unset)
+_endmethod
+$
+
+_pragma(classify_level=unit_test, topic={xsd_loader})
+_method xsd_loader_factory_test.test_restriction_enumeration_1()
+	filename << _self.fixture_path("restriction_enumeration_1.xsd")
+	loader << xsd_loader:xsd_loader_factory.generate_loader(filename, :target_package, :xsd_loader_test)
+	
+	# ensure it validates valid values
+	type << loader.types[{"urn:xsd_loader_test", "Re1"}]
+	instance << type.new("e1")
+	_self.assert(instance, :|~=|, _unset)
+_endmethod
+$
+
+_pragma(classify_level=unit_test, topic={xsd_loader})
+_method xsd_loader_factory_test.test_xsd_restriction_enumeration_2()
+	filename << _self.fixture_path("restriction_enumeration_2.xsd")
+	loader << xsd_loader:xsd_loader_factory.generate_loader(filename, :target_package, :xsd_loader_test)
+	
+	# ensure it give a warning on invalid values
+	type << loader.types[{"urn:xsd_loader_test", "Re2"}]
+	_self.assert_raised_condition(:xsd_loader_invalid_value_for_field, type, :|new()|, {"x1"})
+_endmethod
+$
+
+_pragma(classify_level=unit_test, topic={xsd_loader})
+_method xsd_loader_factory_test.test_restriction_pattern_1()
+	filename << _self.fixture_path("restriction_pattern_1.xsd")
+	loader << xsd_loader:xsd_loader_factory.generate_loader(filename, :target_package, :xsd_loader_test)
+	
+	# ensure it validates valid values
+	type << loader.types[{"urn:xsd_loader_test", "Rp1"}]
+	instance << type.new("test")
+	_self.assert(instance, :|~=|, _unset)
+_endmethod
+$
+
+_pragma(classify_level=unit_test, topic={xsd_loader})
+_method xsd_loader_factory_test.test_restriction_pattern_2()
+	filename << _self.fixture_path("restriction_pattern_2.xsd")
+	loader << xsd_loader:xsd_loader_factory.generate_loader(filename, :target_package, :xsd_loader_test)
+	
+	# ensure it validates valid values
+	type << loader.types[{"urn:xsd_loader_test", "Rp2"}]
+	_self.assert_raised_condition(:xsd_loader_invalid_value_for_field, type, :|new()|, {"123"})
+_endmethod
+$

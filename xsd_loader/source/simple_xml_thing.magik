@@ -1,8 +1,9 @@
 _package user
 
 _pragma(classify_level=advanced)
-_method simple_xml_thing.find_element(p_type)
-	_for i _over _self.find_elements(p_type)
+_method simple_xml_thing.find_element_ns(p_uri, p_local_name)
+	## Find the first progeny of P_TYPE, recusively
+	_for i _over _self.find_elements(p_uri, p_local_name)
 	_loop
 		_return i
 	_endloop
@@ -10,17 +11,20 @@ _endmethod
 $
 
 _pragma(classify_level=advanced)
-_iter _method simple_xml_thing.find_elements(p_type)
+_iter _method simple_xml_thing_ns.find_elements_ns(p_uri, p_local_name)
+	## Find all progenies of P_URI?P_LOCAL_NAME, recursively
 	l_stack << stack.new_from(_self.xml_elements)
 	_loop
 		l_element << l_stack.next()
 		_if l_element _is _unset _then _leave _endif
 		
-		_if l_element.is_class_of?(simple_xml_thing)
+		_if l_element.is_class_of?(simple_xml_thing) _orif
+		    l_element.is_class_of?(simple_xml_thing_ns)
 		_then
 			l_stack.add_all(l_element.xml_elements)
 			
-			_if l_element.type = p_type
+			_if l_element.uri = p_uri _andif
+			    l_element.local_name = p_local_name
 			_then
 				_loopbody(l_element)
 			_endif
