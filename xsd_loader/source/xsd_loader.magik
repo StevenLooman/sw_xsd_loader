@@ -8,21 +8,23 @@ $
 def_slotted_exemplar(
 	:xsd_loader,
 	{
-		{:types, _unset, :readable, :public}
+		{:types, _unset, :readable, :public},
+		{:elements, _unset, :readable, :public}
 	})
 $
 
 _pragma(classify_level=basic, topic={xsd_loader, xsd})
-_method xsd_loader.new(p_types)
+_method xsd_loader.new(p_types, p_elements)
 	##
-	_return _clone.init(p_types)
+	_return _clone.init(p_types, p_elements)
 _endmethod
 $
 
 _pragma(classify_level=basic, topic={xsd_loader, xsd})
-_private _method xsd_loader.init(p_types)
+_private _method xsd_loader.init(p_types, p_elements)
 	##
 	.types << p_types
+	.elements << p_elements
 	_return _self
 _endmethod
 $
@@ -52,23 +54,23 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={xsd_loader, xsd})
-_private _method xsd_loader.load_xml_thing(p_xml_thing, _optional p_magik_type)
-	##
+_private _method xsd_loader.load_xml_thing(p_xml_thing, _optional p_exemplar)
+	## Load an XML-element
 	# get target type
-	l_magik_type << _if p_magik_type _isnt _unset
-			_then
-				>> p_magik_type
-			_else
-				l_namespace << p_xml_thing.uri
-				l_name << p_xml_thing.local_name
-				>> .types[{l_namespace, l_name}]
-			_endif
+	l_name << p_xml_thing.local_name.write_string
+	l_exemplar << _if p_exemplar _isnt _unset
+		      _then
+			      >> p_exemplar
+		      _elif .elements.includes_key?(l_name)
+		      _then
+			      >> .elements[l_name][:magik_exemplar]
+		      _endif
 	
 	# parse children
-	l_props << property_list.new()
+	l_props << equality_property_list.new()
 	_for i_xml_child _over p_xml_thing.xml_elements.fast_elements()
 	_loop
-		(l_child_name, l_child) << _self.parse_xml_child(i_xml_child, l_magik_type)
+		(l_child_name, l_child) << _self.parse_xml_child(i_xml_child, l_exemplar)
 		
 		_if l_props[l_child_name] _is _unset
 		_then
@@ -78,36 +80,27 @@ _private _method xsd_loader.load_xml_thing(p_xml_thing, _optional p_magik_type)
 	_endloop
 	
 	# instantiate object
-	_return l_magik_type.new(l_props)
+	_return l_exemplar.new(l_props)
 _endmethod
 $
 
 _pragma(classify_level=basic, topic={xsd_loader, xsd})
 _private _method xsd_loader.parse_xml_child(p_xml_child, p_parent_type)
-	##
-	l_child_name << _self.generate_slot_name(p_xml_child.local_name).as_symbol()
-	l_child_field_type << p_parent_type.field_types[l_child_name]
-	l_child_magik_type << l_child_field_type[:type]
-	l_child << _if l_child_magik_type _is _unset
+	## Parse an XML-element
+	l_child_name << p_xml_child.local_name.write_string
+	l_element << p_parent_type.xsd_elements[l_child_name]
+	l_exemplar << l_element[:magik_exemplar]
+	l_child << _if l_exemplar _is _unset
 		   _then
 			   >> p_xml_child.xml_contents
-		   _elif l_child_magik_type.is_kind_of?(xsd_simple_type)
+		   _elif l_exemplar.is_kind_of?(xsd_simple_type)
 		   _then
-			   >> l_child_magik_type.new(p_xml_child.xml_contents)
-		   _elif l_child_magik_type.is_kind_of?(xsd_complex_type)
+			   >> l_exemplar.new(p_xml_child.xml_contents)
+		   _elif l_exemplar.is_kind_of?(xsd_complex_type)
 		   _then
-			   >> _self.load_xml_thing(p_xml_child, l_child_magik_type)
+			   >> _self.load_xml_thing(p_xml_child, l_exemplar)
 		   _endif
 	
 	_return l_child_name, l_child
-_endmethod
-$
-
-_pragma(classify_level=basic, topic={xsd_loader, xsd})
-_private _method xsd_loader.generate_slot_name(p_name)
-	##
-	# XXX TODO: follow xsd_loader_factory, don't make up own slot name
-	l_snake_case << p_name.write_string.as_snake_case()
-	_return l_snake_case.as_symbol()
 _endmethod
 $

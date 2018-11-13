@@ -3,7 +3,7 @@ _package user
 _pragma(classify_level=advanced)
 _method simple_xml_thing.find_element_ns(p_uri, p_local_name)
 	## Find the first progeny of P_TYPE, recusively
-	_for i _over _self.find_elements(p_uri, p_local_name)
+	_for i _over _self.find_elements_ns(p_uri, p_local_name)
 	_loop
 		_return i
 	_endloop

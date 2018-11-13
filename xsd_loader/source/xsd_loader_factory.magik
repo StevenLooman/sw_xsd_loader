@@ -11,7 +11,8 @@ def_slotted_exemplar(
 		{:properties, _unset, :readable, :public},
 		
 		{:types, _unset, :readable, :public},
-		{:anonymous_types, _unset, :readable, :public}
+		{:anonymous_types, _unset, :readable, :public},
+		{:elements, _unset, :readable, :public}
 	})
 $
 
@@ -38,6 +39,7 @@ _private _method xsd_loader_factory.init(p_properties)
 	
 	.types << vector_key_equality_hash_table.new()
 	.anonymous_types << set.new()
+	.elements << equality_hash_table.new()
 	
 	_return _self
 _endmethod
@@ -49,6 +51,7 @@ _private _method xsd_loader_factory.reset()
 	.properties << _unset
 	.types << _unset
 	.anonymous_types << _unset
+	.elements << _unset
 _endmethod
 $
 
@@ -70,7 +73,7 @@ _method xsd_loader_factory.generate_loader(p_filename, _gather p_properties)
 	_endif
 	
 	_self.parse_xsd(p_filename)
-	l_loader << xsd_loader.new(.types)
+	l_loader << xsd_loader.new(.types, .elements)
 	_self.reset()
 	_return l_loader
 _endmethod
@@ -108,13 +111,14 @@ _private _method xsd_loader_factory.parse_xsd(p_filename)
 	## Parse the XSD.
 	l_simple_xml << simple_xml.new(:process_ns?, _true)
 	l_xsd << l_simple_xml.read_document_file(p_filename)
-
+	
 	l_base_dir << system.pathname_up(p_filename)
 	_self.parse_includes(l_xsd, l_base_dir)
 	_self.parse_imports(l_xsd, l_base_dir)
 	_self.parse_simple_types(l_xsd)
 	_self.parse_complex_types(l_xsd)
-	_self.set_field_types_type(l_xsd)
+	_self.parse_elements(l_xsd)
+	_self.set_types(l_xsd)
 _endmethod
 $
 
@@ -165,43 +169,42 @@ _private _method xsd_loader_factory.parse_simple_types(p_xsd)
 	l_root << p_xsd.top_element
 	_for i_child _over l_root.get_elements({"http://www.w3.org/2001/XMLSchema?simpleType", :any})
 	_loop
-		_self.parse_simple_type(p_xsd, i_child)
+		(l_type_key, l_exemplar) << _self.parse_simple_type(p_xsd, i_child)
+		.types[l_type_key] << l_exemplar
 	_endloop
 _endmethod
 $
 
 _pragma(classify_level=basic, topic={xsd_loader, xsd})
-_private _method xsd_loader_factory.parse_simple_type(p_xsd, p_type)
+_private _method xsd_loader_factory.parse_simple_type(p_xsd, p_simple_type)
 	## Parse a <simpleType> from the XSD.
-	l_name << p_type.attribute(:name)
-	l_type_name << _self.generate_exemplar_name(l_name, p_type)
+	l_name << p_simple_type.attribute(:name)
+	(l_target_namespace, l_el_name) << _self.namespace_for_type(p_xsd, l_name)
+	l_exemplar_name << _self.generate_exemplar_name(l_name, p_simple_type)
 	
 	# get base type
-	l_restriction << p_type.get_element({"http://www.w3.org/2001/XMLSchema?restriction"})
+	l_restriction << p_simple_type.get_element({"http://www.w3.org/2001/XMLSchema?restriction"})
 	l_base_type << l_restriction.attribute(:base)
 	
-	# build restriction
-	l_restrictions << _self.parse_restriction(l_restriction)
-	
-	# create restriction exemplar
-	l_base_types << _if .properties[:base_exemplar] _isnt _unset
-			_then
-				>> {@xsd_loader:xsd_simple_type, .properties[:base_exemplar]}
-			_else
-				>> {@xsd_loader:xsd_simple_type}
-			_endif
+	# create exemplar
+	l_parent_exemplars << _if .properties[:base_exemplar] _isnt _unset
+			      _then
+				      >> {@xsd_loader:xsd_simple_type, .properties[:base_exemplar]}
+			      _else
+				      >> {@xsd_loader:xsd_simple_type}
+			      _endif
 	_block
 		_handling conflict_methods _with _self.method_conflict_resolver(.properties[:base_exemplar])
 		_dynamic !current_package! << .properties[:target_package]
-		l_type << def_slotted_exemplar(l_type_name, {}, l_base_types)
+		l_exemplar << def_slotted_exemplar(l_exemplar_name, {}, l_parent_exemplars)
 	_endblock
-	l_type.define_shared_constant(:xsd_type_name, l_name, :public)
-	l_type.define_shared_constant(:xsd_type, p_type, :public)
-	l_type.define_shared_constant(:xsd_base_type, l_base_type, :public)
-	l_type.define_shared_constant(:xsd_restrictions, l_restrictions, :public)
+	l_exemplar.define_shared_constant(:xsd_node, p_simple_type, :public)
+	l_exemplar.define_shared_constant(:xsd_namespace, l_target_namespace, :public)
+	l_exemplar.define_shared_constant(:xsd_name, l_el_name, :public)
+	l_exemplar.define_shared_constant(:xsd_base_type, l_base_type, :public)
 	
 	l_target_namespace << _self.target_namespace(p_xsd)
-	.types[{l_target_namespace, l_name}] << l_type
+	_return {l_target_namespace, l_name}, l_exemplar
 _endmethod
 $
 
@@ -211,71 +214,41 @@ _private _method xsd_loader_factory.parse_complex_types(p_xsd)
 	l_root << p_xsd.top_element
 	_for i_child _over l_root.get_elements({"http://www.w3.org/2001/XMLSchema?complexType", :any})
 	_loop
-		_self.parse_complex_type(p_xsd, i_child)
+		(l_type_key, l_exemplar) << _self.parse_complex_type(p_xsd, i_child)
+		.types[l_type_key] << l_exemplar
 	_endloop
 _endmethod
 $
 
 _pragma(classify_level=basic, topic={xsd_loader, xsd})
-_private _method xsd_loader_factory.parse_restriction(p_restriction)
-	## Parse a <restriction> from the XSD.
-	## Gets all <enumerations> and <patterns> and creates
-	## xsd_restrictions from these.
-	l_restrictions << set.new()
-	
-	# XXX TODO: restriction for base type?
-	
-	_for i_child _over p_restriction.get_elements({"http://www.w3.org/2001/XMLSchema?enumeration", :any})
-	_loop
-		l_value << i_child.attribute(:value)
-		l_restriction << xsd_restriction_enumeration.new(l_value)
-		l_restrictions.add(l_restriction)
-	_endloop
-	
-	_for i_child _over p_restriction.get_elements({"http://www.w3.org/2001/XMLSchema?pattern", :any})
-	_loop
-		l_value << i_child.attribute(:value)
-		l_restriction << xsd_restriction_pattern.new(l_value)
-		l_restrictions.add(l_restriction)
-	_endloop
-	
-	_return l_restrictions
-_endmethod
-$
-
-_pragma(classify_level=basic, topic={xsd_loader, xsd})
-_private _method xsd_loader_factory.parse_anonymous_simple_type(p_xsd, p_type)
+_private _method xsd_loader_factory.parse_anonymous_simple_type(p_xsd, p_simple_type)
 	## Parse a nameless <simpleType> from the XSD.
 	l_target_namespace << _self.target_namespace(p_xsd)
-	l_type_name << :anonymous_type_ + (.anonymous_types.size + 1).write_string
+	l_exemplar_name << :anonymous_type_ + (.anonymous_types.size + 1).write_string
 	
 	# get base type
-	# XXX TODO: find_element_ns()?
-	l_restriction << p_type.get_element({"http://www.w3.org/2001/XMLSchema?restriction"})
+	l_restriction << p_simple_type.get_element({"http://www.w3.org/2001/XMLSchema?restriction"})
 	l_base_type << l_restriction.attribute(:base)
 	
-	# build restriction
-	l_restrictions << _self.parse_restrictions(l_restriction)
-	
-	# create restriction exemplar
-	l_base_types << _if .properties[:base_exemplar] _isnt _unset
-			_then
-				>> {@xsd_loader:xsd_simple_type, .properties[:base_exemplar]}
-			_else
-				>> {@xsd_loader:xsd_simple_type}
-			_endif
+	# create exemplar
+	l_parents << _if .properties[:base_exemplar] _isnt _unset
+		     _then
+			     >> {@xsd_loader:xsd_simple_type, .properties[:base_exemplar]}
+		     _else
+			     >> {@xsd_loader:xsd_simple_type}
+		     _endif
 	_block
 		_handling conflict_methods _with _self.method_conflict_resolver(.properties[:base_exemplar])
 		_dynamic !current_package! << .properties[:target_package]
-		l_type << def_slotted_exemplar(l_type_name, {}, l_base_types)
+		l_exemplar << def_slotted_exemplar(l_exemplar_name, {}, l_parents)
 	_endblock
-	l_type.define_shared_constant(:xsd_type_name, _unset, :public)
-	l_type.define_shared_constant(:xsd_namespace, l_target_namespace)
-	l_type.define_shared_constant(:xsd_type, p_type, :public)
-	l_type.define_shared_constant(:xsd_base_type, l_base_type, :public)
-	l_type.define_shared_constant(:xsd_restrictions, l_restrictions, :public)
-	.anonymous_types.add(l_type)
-	_return l_type
+	l_exemplar.define_shared_constant(:xsd_node, p_simple_type, :public)
+	l_exemplar.define_shared_constant(:xsd_namespace, l_target_namespace, :public)
+	l_exemplar.define_shared_constant(:xsd_name, _unset, :public)
+	l_exemplar.define_shared_constant(:xsd_base_type, l_base_type, :public)
+	
+	.anonymous_types.add(l_exemplar)
+	_return l_exemplar
 _endmethod
 $
 
@@ -284,99 +257,111 @@ _private _method xsd_loader_factory.parse_complex_type(p_xsd, p_complex_type)
 	## Parse a <complexType> from the XSD.
 	l_name << p_complex_type.attribute(:name)
 	l_target_namespace << _self.target_namespace(p_xsd)
-	_if .types[{l_target_namespace, l_name}] _isnt _unset _then _return _endif  # already seen
+	_if .types[{l_target_namespace, l_name}] _isnt _unset
+	_then
+		l_type_key << {l_target_namespace, l_name}
+		l_exemplar << .types[l_type_key]
+		_return l_type_key, l_exemplar
+	_endif
 	
-	l_type_name << _self.generate_exemplar_name(l_name, p_complex_type)
+	# handle extensions
+	(l_parent_exemplars, l_elements) << _self.parse_complex_type_extension(p_xsd, p_complex_type)
+	_if l_parent_exemplars.empty?
+	_then
+		l_parent_exemplars.add(@xsd_loader:xsd_complex_type)
+		_if .properties[:base_exemplar] _isnt _unset
+		_then
+			l_parent_exemplars.add(.properties[:base_exemplar])
+		_endif
+	_endif
+	
+	# gather elements and slot names
 	l_slots << rope.new()
-	l_base_classes << rope.new()
-	l_field_types << property_list.new()
+	_for i_child _over p_complex_type.find_elements_ns("http://www.w3.org/2001/XMLSchema", :element)
+	_loop
+		(l_el_name, l_props) << _self.parse_element(p_xsd, p_complex_type, i_child)
+		l_elements[l_el_name] << l_props
+		
+		# only save local slots, don't include slots from
+		# parent types as these are inherited
+		l_slot_name << l_props[:magik_slot_name]
+		l_slots.add(l_slot_name)
+	_endloop
 	
-	# special case: inheritance
-	# XXX TODO: refactor to own method
-	_for i_child _over p_complex_type.find_elements_ns("http://www.w3.org/2001/XMLSchema", :extension)
+	# build slots from elements
+	l_slots << l_slots.map(_proc(p_slot_name) _return {p_slot_name, _unset} _endproc).as_simple_vector()
+	
+	# create exemplar
+	l_exemplar_name << _self.generate_exemplar_name(l_name, p_complex_type)
+	l_parent_exemplars << l_parent_exemplars.as_simple_vector()
+	_block
+		_handling conflict_methods _with _self.method_conflict_resolver(.properties[:base_exemplar])
+		_dynamic !current_package! << .properties[:target_package]
+		l_exemplar << def_slotted_exemplar(l_exemplar_name, l_slots, l_parent_exemplars)
+	_endblock
+	l_exemplar.define_shared_constant(:xsd_node, p_complex_type, :public)
+	l_exemplar.define_shared_constant(:xsd_namespace, l_target_namespace, :public)
+	l_exemplar.define_shared_constant(:xsd_name, l_name, :public)
+	l_exemplar.define_shared_constant(:xsd_elements, l_elements, :public)
+	_self.define_getter_methods(l_exemplar)
+	
+	_return {l_target_namespace, l_name}, l_exemplar
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_private _method xsd_loader_factory.parse_complex_type_extension(p_xsd, p_complex_type)
+	## Parse <complexType>/<extension>
+	l_parent_exemplars << rope.new()
+	l_elements << equality_property_list.new()
+	_for i_extension _over p_complex_type.find_elements_ns("http://www.w3.org/2001/XMLSchema", :extension)
 	_loop
 		# generate parent type first, if needed and available
-		l_base_name << i_child.attribute(:base)
+		l_base_name << i_extension.attribute(:base)
 		(l_base_namespace, l_base_name) << _self.namespace_for_type(p_xsd, l_base_name)
 		_if _not .types.includes_key?({l_base_namespace, l_base_name})
 		_then
-			l_base_type << p_xsd.top_element.get_element({"http://www.w3.org/2001/XMLSchema?complexType", :name, l_base_name})
-			_if l_base_type _is _unset
+			l_base_complex_type << p_xsd.top_element.get_element({"http://www.w3.org/2001/XMLSchema?complexType", :name, l_base_name})
+			_if l_base_complex_type _is _unset
 			_then
 				condition.raise(:xsd_loading_missing_type,
 						:namespace, l_base_namespace,
 						:name, l_base_name)
 			_endif
-			_self.parse_complex_type(p_xsd, l_base_type)
+			(l_type_key, l_exemplar) << _self.parse_complex_type(p_xsd, l_base_complex_type)
+			.types[l_type_key] << l_exemplar
 		_endif
 		
 		# copy field types
-		l_base_class << .types[{l_base_namespace, l_base_name}]
-		l_field_types.add_all(l_base_class.field_types)
+		l_base_exemplar << .types[{l_base_namespace, l_base_name}]
+		l_elements.add_all(l_base_exemplar.xsd_elements)
 		
 		# add to inheritance table
-		l_base_classes.add(l_base_class.class_name)
+		l_parent_exemplars.add(l_base_exemplar.class_name)
 	_endloop
-	_if l_base_classes.empty?
-	_then
-		l_base_classes.add(@xsd_loader:xsd_complex_type)
-		_if .properties[:base_exemplar] _isnt _unset
-		_then
-			l_base_classes.add(.properties[:base_exemplar])
-		_endif
-	_endif
-	
-	# gather elements
-	# XXX TODO: refactor to own method
-	_for i_child _over p_complex_type.find_elements_ns("http://www.w3.org/2001/XMLSchema", :element)
-	_loop
-		# XXX TODO: in case of a xs:choice, then we need to extract the
-		# min/maxOccurs from the xs:choice, not from the xs:element
-		(l_el_name, l_props, l_slot) << _self.parse_complex_type_element(p_xsd, p_complex_type, i_child)
-		_if l_el_name _is _unset
-		_then
-			# XXX TODO: why?
-			_continue
-		_endif
-		l_field_types[l_el_name] << l_props
-		l_slots.add(l_slot)
-	_endloop
-	
-	# gather choices, overwriting elements
-	_for i_choice _over p_complex_type.find_elements_ns("http://www.w3.org/2001/XMLSchema", :choice)
-	_loop
-		_for i_child _over p_complex_type.find_elements_ns("http://www.w3.org/2001/XMLSchema", :element)
-		_loop
-			# XXX TODO
-		_endloop
-	_endloop
-	
-	# create slotted exemplar
-	l_slots << l_slots.as_simple_vector()
-	l_base_classes << l_base_classes.as_simple_vector()
-	_block
-		_handling conflict_methods _with _self.method_conflict_resolver(.properties[:base_exemplar])
-		_dynamic !current_package! << .properties[:target_package]
-		l_type << def_slotted_exemplar(l_type_name, l_slots, l_base_classes)
-	_endblock
-	l_type.define_shared_constant(:xsd_type_name, l_name, :public)
-	l_type.define_shared_constant(:xsd_type, p_complex_type, :public)
-	l_type.define_shared_constant(:field_types, l_field_types, :public)
-	_self.define_getter_methods(l_type)
-	_self.define_setter_methods(l_type)
-	
-	_return .types[{l_target_namespace, l_name}] << l_type
+	_return l_parent_exemplars, l_elements
 _endmethod
 $
 
 _pragma(classify_level=basic, topic={xsd_loader, xsd})
-_private _method xsd_loader_factory.parse_complex_type_element(p_xsd, p_complex_type, p_element, _optional p_min_occurs, p_max_occurs)
+_private _method xsd_loader_factory.parse_element(p_xsd, p_parent_element, p_element)
 	## Parse an <element> from a <complexType> from the XSD.
-	l_el_min_occurs << p_min_occurs.default(p_element.attribute(:|minOccurs|).default("1"))
-	l_el_max_occurs << p_max_occurs.default(p_element.attribute(:|maxOccurs|).default("1"))
-	l_el_name       << p_element.attribute(:name)
-	l_el_type_name  << p_element.attribute(:type)
-	l_el_ref        << p_element.attribute(:ref)
+	l_el_min_occurs << p_element.attribute(:|minOccurs|).default("1")
+	l_el_max_occurs << p_element.attribute(:|maxOccurs|).default("1")
+	l_el_name << p_element.attribute(:name)
+	l_el_type << p_element.attribute(:type)
+	l_el_ref << p_element.attribute(:ref)
+	l_el_annotation << _unset
+
+	# annotation
+	_for i_annotation _over p_element.get_elements({"http://www.w3.org/2001/XMLSchema?annotation"})
+	_loop @over_annotations
+		_for i_documentation _over i_annotation.get_elements({"http://www.w3.org/2001/XMLSchema?documentation"})
+		_loop @over_documentation
+			l_el_annotation << i_documentation.xml_contents
+			_leave @over_annotations
+		_endloop
+	_endloop
 	
 	_if l_el_name _is _unset _andif
 	    l_el_ref _is _unset
@@ -387,10 +372,10 @@ _private _method xsd_loader_factory.parse_complex_type_element(p_xsd, p_complex_
 	
 	# nested (unnamed) types
 	l_anon_simple_type << p_element.find_element_ns("http://www.w3.org/2001/XMLSchema", :simpleType)
-	l_type << _if l_anon_simple_type _isnt _unset
-		  _then
-			  >> _self.parse_anonymous_simple_type(p_xsd, l_anon_simple_type)
-		  _endif
+	l_exemplar << _if l_anon_simple_type _isnt _unset
+		      _then
+			      >> _self.parse_anonymous_simple_type(p_xsd, l_anon_simple_type)
+		      _endif
 	
 	_if l_el_ref _isnt _unset
 	_then
@@ -402,19 +387,33 @@ _private _method xsd_loader_factory.parse_complex_type_element(p_xsd, p_complex_
 		l_el_type_name << l_reffed_el.attribute(:type)
 	_endif
 	
-	l_el_name << _self.generate_slot_name(l_el_name, p_complex_type, p_element)
-	l_target_namespace << _self.target_namespace(p_xsd)
+	(l_type_namespace, l_type_name) << _self.namespace_for_type(p_xsd, l_el_type)
+	l_slot_name << _self.generate_slot_name(l_el_name, p_parent_element, p_element)
 	l_props << property_list.new_with(
-			   :type, l_type,
-			   :xsd_namespace, l_target_namespace,
-			   :xsd_name, l_el_name,
-			   :xsd_type_name, l_el_type_name,
-			   :min_occurs, l_el_min_occurs,
-			   :max_occurs, l_el_max_occurs,
-			   :ref, l_el_ref)
-	l_slot_def << {l_el_name, _unset}
+			   :magik_exemplar, l_exemplar,
+			   :magik_slot_name, l_slot_name,
+			   :xsd_node, p_element,
+			   :xsd_element_name, l_el_name,
+			   :xsd_namespace, l_type_namespace,
+			   :xsd_name, l_type_name,
+			   :xsd_min_occurs, l_el_min_occurs,
+			   :xsd_max_occurs, l_el_max_occurs,
+			   :xsd_ref, l_el_ref,
+			   :xsd_annotation, l_el_annotation)
 	
-	_return	l_el_name, l_props, l_slot_def
+	_return	l_el_name, l_props
+_endmethod
+$
+
+_pragma(classify_level=basic, topic={xsd_loader, xsd})
+_private _method xsd_loader_factory.parse_elements(p_xsd)
+	## Parse top level <element>s
+	l_root << p_xsd.top_element
+	_for i_child _over l_root.get_elements({"http://www.w3.org/2001/XMLSchema?element", :any})
+	_loop
+		(l_name, l_props) << _self.parse_element(p_xsd, _unset, i_child)
+		.elements[l_name] << l_props
+	_endloop
 _endmethod
 $
 
@@ -441,56 +440,34 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={xsd_loader, xsd})
-_private _method xsd_loader_factory.define_getter_methods(p_type)
+_private _method xsd_loader_factory.define_getter_methods(p_exemplar)
 	## Define getter methods for <complexType>.
 	_dynamic !source_file!
 	l_source_file << !source_file!
-	_for i_child_name, i_props _over p_type.field_types.fast_keys_and_elements()
+	_for i_element_name, i_props _over p_exemplar.xsd_elements.fast_keys_and_elements()
 	_loop
+		l_slot_name << i_props[:magik_slot_name]
 		l_proc << _proc()
-				  _import i_child_name
-				  _return _self.retrieve(i_child_name)
+				  _import i_element_name
+				  _return _self.retrieve(i_element_name)
 			  _endproc
-		l_method << p_type.define_method(i_child_name, l_proc, _false)
-		l_comment << write_string("Get ", i_child_name)
-		method_finder.send_method_info(l_method, _unset, { l_comment }, l_source_file)
-	_endloop
-_endmethod
-$
-
-_pragma(classify_level=basic, topic={xsd_loader, xsd})
-_private _method xsd_loader_factory.define_setter_methods(p_type)
-	## Define setter-methods for <complexType>.
-	_dynamic !source_file!
-	l_source_file << !source_file!
-	_for i_child_name, i_props _over p_type.field_types.fast_keys_and_elements()
-	_loop
-		# chevron
-		l_proc << _proc(p_value)
-				  _import i_child_name
-				  _return _self.assign(i_child_name, p_value)
-			  _endproc
-		l_method << p_type.define_method(i_child_name.with_chevron, l_proc, _false)
-		l_comment << write_string("Set ", i_child_name)
-		method_finder.send_method_info(l_method, _unset, { l_comment }, l_source_file)
+		l_method << p_exemplar.define_method(l_slot_name, l_proc, _false)
 		
-		# boot chevron
-		l_proc << _proc(p_value)
-				  _import i_child_name
-				  l_old_value << _self.retrieve(i_child_name)
-				  _self.assign(i_child_name, p_value)
-				  _return l_old_value
-			  _endproc
-		p_type.define_method(i_child_name.with_boot_chevron, l_proc, _false)
-		l_comment << write_string("Set ", i_child_name)
-		method_finder.send_method_info(l_method, _unset, { l_comment }, l_source_file)
+		l_comments << rope.new_with(write_string("Get ", i_element_name))
+#		_if i_props[:xsd_annotation] _isnt _unset
+#		_then
+#			l_annotation << i_props[:xsd_annotation]
+#			l_comments.add(l_annotation)
+#		_endif
+		
+		method_finder.send_method_info(l_method, _unset, l_comments, l_source_file)
 	_endloop
 _endmethod
 $
 
 _pragma(classify_level=basic, topic={xsd_loader, xsd})
-_private _method xsd_loader_factory.set_field_types_type()
-	## Set all field_types for all <simpleType>s.
+_private _method xsd_loader_factory.set_types(p_xsd)
+	## Set all field_types for all <simpleType>s and <complexType>s.
 	_for i_type _over .types.fast_elements()
 	_loop
 		_if _not i_type.is_kind_of?(xsd_complex_type)
@@ -498,14 +475,25 @@ _private _method xsd_loader_factory.set_field_types_type()
 			_continue
 		_endif
 		
-		_for i_field_name, i_props _over i_type.field_types.fast_keys_and_elements()
+		_for i_props _over i_type.xsd_elements.fast_elements()
 		_loop
-			_if (l_type_name << i_props[:xsd_type_name]) _isnt _unset _andif
-			    (l_magik_type << .types[l_type_name]) _isnt _unset
+			l_namespace << i_props[:xsd_namespace]
+			l_name << i_props[:xsd_name]
+			_if (l_exemplar << .types[{l_namespace, l_name}]) _isnt _unset
 			_then
-				i_props[:type] << l_magik_type
+				i_props[:magik_exemplar] << l_exemplar
 			_endif
 		_endloop
+	_endloop
+	
+	_for i_props _over .elements.fast_elements()
+	_loop
+		l_namespace << i_props[:xsd_namespace]
+		l_name << i_props[:xsd_name]
+		_if (l_exemplar << .types[{l_namespace, l_name}]) _isnt _unset
+		_then
+			i_props[:magik_exemplar] << l_exemplar
+		_endif
 	_endloop
 _endmethod
 $
