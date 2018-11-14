@@ -424,19 +424,20 @@ _private _method xsd_loader_factory.method_conflict_resolver(p_xsd_exemplar, p_b
 			_import p_xsd_exemplar, p_base_exemplar_ref
 			_for i_method _over p_cond[:methods].fast_elements()
 			_loop
-				_if p_xsd_exemplar.define_method_target.local_method?(i_method.name)
+				_if p_base_exemplar_ref _isnt _unset _andif
+				    p_base_exemplar_ref.define_method_target.responds_to?(i_method.name)
+				_then
+					i_method.owner.resolve_conflicts(p_base_exemplar_ref.value.class_name, {i_method.name})
+				_elif p_xsd_exemplar.define_method_target.local_method?(i_method.name)
 				_then
 					# does_not_understand()
 					i_method.owner.resolve_conflicts(p_xsd_exemplar.class_name, {i_method.name})
-				_elif p_base_exemplar_ref _isnt _unset _andif
-				      p_base_exemplar_ref.define_method_target.responds_to?(i_method.name)
-				_then
-					i_method.owner.resolve_conflicts(p_base_exemplar_ref.value.class_name, {i_method.name})
 				_endif
 			_endloop
 		_endproc
 _endmethod
 $
+
 _pragma(classify_level=basic, topic={xsd_loader, xsd})
 _private _method xsd_loader_factory.define_getter_methods(p_exemplar)
 	## Define getter methods for <complexType>.

@@ -40,6 +40,12 @@ _private _method xsd_complex_type.init(p_children)
 	_loop
 		_self.assign(i_key, i_value)
 	_endloop
+	
+	_if _self.responds_to?(:init_from_xml|()|, _true)
+	_then
+		_self.init_from_xml(p_children)
+	_endif
+	
 	_return _self
 _endmethod
 $
@@ -131,6 +137,12 @@ _pragma(classify_level=basic, topic={xsd_loader, xsd})
 _private _method xsd_simple_type.init(p_value)
 	##
 	_self.value << _self.convert_value(p_value)
+	
+	_if _self.responds_to?(:init_from_xml|()|, _true)
+	_then
+		_self.init_from_xml(p_value)
+	_endif
+	
 	_return _self
 _endmethod
 $
@@ -158,6 +170,9 @@ _method xsd_simple_type.convert_value(p_value)
 					   "0",     _false)
 		_return l_map[p_value]
 	_elif l_xsd_type = "xs:int"
+	_then
+		_return p_value.as_number()
+	_elif l_xsd_type = "xs:decimal"
 	_then
 		_return p_value.as_number()
 	_elif l_xsd_type = "xs:string"
