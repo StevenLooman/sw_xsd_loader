@@ -138,29 +138,7 @@ $
 _pragma(classify_level=basic, topic={xsd_loader, xsd})
 _method xsd_simple_type.value<< p_value
 	##
-	_if _not _self.valid_value?(p_value)
-	_then
-		condition.raise(:xsd_loader_invalid_value_for_field, :string, write_string("Invalid value ", p_value))
-	_endif
 	.value << p_value
-_endmethod
-$
-
-_pragma(classify_level=basic, topic={xsd_loader, xsd})
-_method xsd_simple_type.valid_value?(p_value)
-	_if _self.xsd_restrictions.empty?
-	_then
-		_return _true
-	_endif
-	
-	_for i_restriction _over _self.xsd_restrictions.fast_elements()
-	_loop
-		_if i_restriction.valid_value?(p_value)
-		_then
-			_return _true
-		_endif
-	_endloop
-	_return _false
 _endmethod
 $
 

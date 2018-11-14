@@ -194,7 +194,7 @@ _private _method xsd_loader_factory.parse_simple_type(p_xsd, p_simple_type)
 				      >> {@xsd_loader:xsd_simple_type}
 			      _endif
 	_block
-		_handling conflict_methods _with _self.method_conflict_resolver(.properties[:base_exemplar])
+		_handling conflict_methods _with _self.method_conflict_resolver(xsd_simple_type, .properties[:base_exemplar])
 		_dynamic !current_package! << .properties[:target_package]
 		l_exemplar << def_slotted_exemplar(l_exemplar_name, {}, l_parent_exemplars)
 	_endblock
@@ -238,7 +238,7 @@ _private _method xsd_loader_factory.parse_anonymous_simple_type(p_xsd, p_simple_
 			     >> {@xsd_loader:xsd_simple_type}
 		     _endif
 	_block
-		_handling conflict_methods _with _self.method_conflict_resolver(.properties[:base_exemplar])
+		_handling conflict_methods _with _self.method_conflict_resolver(xsd_simple_type, .properties[:base_exemplar])
 		_dynamic !current_package! << .properties[:target_package]
 		l_exemplar << def_slotted_exemplar(l_exemplar_name, {}, l_parents)
 	_endblock
@@ -295,7 +295,7 @@ _private _method xsd_loader_factory.parse_complex_type(p_xsd, p_complex_type)
 	l_exemplar_name << _self.generate_exemplar_name(l_name, p_complex_type)
 	l_parent_exemplars << l_parent_exemplars.as_simple_vector()
 	_block
-		_handling conflict_methods _with _self.method_conflict_resolver(.properties[:base_exemplar])
+		_handling conflict_methods _with _self.method_conflict_resolver(xsd_complex_type, .properties[:base_exemplar])
 		_dynamic !current_package! << .properties[:target_package]
 		l_exemplar << def_slotted_exemplar(l_exemplar_name, l_slots, l_parent_exemplars)
 	_endblock
@@ -418,27 +418,25 @@ _endmethod
 $
 
 _pragma(classify_level=basic, topic={xsd_loader, xsd})
-_private _method xsd_loader_factory.method_conflict_resolver(p_base_exemplar)
+_private _method xsd_loader_factory.method_conflict_resolver(p_xsd_exemplar, p_base_exemplar_ref)
 	## Method conflict resolver.
-	_return _proc @auto_conflict_resolver(cond)
-			_import p_base_exemplar
-			l_data << property_list.new_from_gathered(cond.data)  # propertize cond.data, as this is not done yet
-			_for i_method _over l_data[:methods].fast_elements()
+	_return _proc @auto_conflict_resolver(p_cond)
+			_import p_xsd_exemplar, p_base_exemplar_ref
+			_for i_method _over p_cond[:methods].fast_elements()
 			_loop
-				_if xsd_complex_type.define_method_target.local_method?(i_method.name)
+				_if p_xsd_exemplar.define_method_target.local_method?(i_method.name)
 				_then
 					# does_not_understand()
-					i_method.owner.resolve_conflicts(:xsd_complex_type, {i_method.name})
-				_elif p_base_exemplar _isnt _unset _andif
-				      p_base_exemplar.define_method_target.responds_to?(i_method.name)
+					i_method.owner.resolve_conflicts(p_xsd_exemplar.class_name, {i_method.name})
+				_elif p_base_exemplar_ref _isnt _unset _andif
+				      p_base_exemplar_ref.define_method_target.responds_to?(i_method.name)
 				_then
-					i_method.owner.resolve_conflicts(p_base_exemplar.value.class_name, {i_method.name})
+					i_method.owner.resolve_conflicts(p_base_exemplar_ref.value.class_name, {i_method.name})
 				_endif
 			_endloop
 		_endproc
 _endmethod
 $
-
 _pragma(classify_level=basic, topic={xsd_loader, xsd})
 _private _method xsd_loader_factory.define_getter_methods(p_exemplar)
 	## Define getter methods for <complexType>.
