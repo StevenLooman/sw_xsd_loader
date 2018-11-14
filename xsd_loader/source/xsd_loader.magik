@@ -46,7 +46,7 @@ _method xsd_loader.load_xml_from_string(p_xml_string)
 	## Load and convert an XML string conforming to the loaded XSD
 	## Creates in-memory objects from the XML, derived from the XSD
 	l_simple_xml << simple_xml.new(:process_ns?, _true)
-	l_xml << l_simple_xml.read_document_string(p_filename)
+	l_xml << l_simple_xml.read_document_string(p_xml_string)
 	
 	# parse XML, transforming elements to objects
 	_return _self.load_xml_thing(l_xml.top_element)
