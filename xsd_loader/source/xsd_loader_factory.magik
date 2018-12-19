@@ -97,7 +97,8 @@ _private _method xsd_loader_factory.namespace_for_type(p_xsd, p_type_name)
 		l_namespace_prefixes[i_prefix] << i_namespace
 	_endloop
 	
-	_if _not p_type_name.includes?(%:)
+	_if p_type_name _is _unset _orif
+	    _not p_type_name.includes?(%:)
 	_then
 		_return _self.target_namespace(p_xsd), p_type_name
 	_endif
