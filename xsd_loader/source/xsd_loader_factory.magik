@@ -277,7 +277,7 @@ _private _method xsd_loader_factory.parse_complex_type(p_xsd, p_complex_type, _o
 	
 	# gather elements and slot names
 	l_slots << rope.new()
-	_for i_child _over p_complex_type.get_elements({"http://www.w3.org/2001/XMLSchema?sequence"}, {"http://www.w3.org/2001/XMLSchema?element", :any})
+	_for i_child _over p_complex_type.get_elements({"http://www.w3.org/2001/XMLSchema?sequence"}, {"http://www.w3.org/2001/XMLSchema?choice", :any}, {"http://www.w3.org/2001/XMLSchema?element", :any})
 	_loop
 		(l_el_name, l_props) << _self.parse_element(p_xsd, p_complex_type, i_child)
 		l_elements[l_el_name] << l_props
