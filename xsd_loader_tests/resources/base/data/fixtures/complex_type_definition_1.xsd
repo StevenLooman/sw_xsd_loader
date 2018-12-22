@@ -3,4 +3,5 @@
 	   xmlns:xs="http://www.w3.org/2001/XMLSchema"
 	   targetNamespace="urn:xsd_loader_test" xmlns:tns="urn:xsd_loader_test">
   <xs:complexType name="Ct1" />
+  <xs:element name="ct1" type="tns:Ct1"/>
 </xs:schema>

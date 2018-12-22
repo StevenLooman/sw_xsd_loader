@@ -5,4 +5,5 @@
   <xs:simpleType name="St1">
     <xs:restriction base="xs:string"/>
   </xs:simpleType>
+  <xs:element name="st1" type="tns:St1"/>
 </xs:schema>

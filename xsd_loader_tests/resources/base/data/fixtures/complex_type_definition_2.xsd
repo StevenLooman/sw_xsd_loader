@@ -7,4 +7,5 @@
       <xs:element name="e1" type="xs:string" />
     </xs:sequence>
   </xs:complexType>
+  <xs:element name="ct2" type="tns:Ct2"/>
 </xs:schema>

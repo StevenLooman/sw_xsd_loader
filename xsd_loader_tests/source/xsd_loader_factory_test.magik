@@ -60,14 +60,12 @@ _method xsd_loader_factory_test.test_complex_type_definition_2()
 	_self.assert(type, :|~=|, _unset)
 	
 	# ensure type has field e1
-	field_type << property_list.new_with(:type, _unset,
-					     :xsd_namespace, "urn:xsd_loader_test",
-					     :xsd_name, :e1,
-					     :xsd_type_name, "xs:string",
-					     :min_occurs, "1",
-					     :max_occurs, "1",
-					     :ref, _unset)
-	_self.assert(type.field_types[:e1], :|assert_equals?()|, field_type)
+	xsd_element << type.xsd_elements["e1"]
+	_self.assert_not_unset(xsd_element)
+	_self.assert_equals(xsd_element[:magik_exemplar], _unset)
+	_self.assert_equals(xsd_element[:magik_slot_name], :e1)
+	_self.assert_equals(xsd_element[:xsd_element_name], "e1")
+	_self.assert_equals(xsd_element[:xsd_namespace], "http://www.w3.org/2001/XMLSchema")
 _endmethod
 $
 
@@ -82,52 +80,12 @@ _method xsd_loader_factory_test.test_complex_type_definition_3()
 	_self.assert(type, :|~=|, _unset)
 	
 	# ensure type has field e1
-	_self.assert(type.field_types[:e1], :|~=|, _unset)
-_endmethod
-$
-
-_pragma(classify_level=unit_test, topic={xsd_loader})
-_method xsd_loader_factory_test.test_restriction_enumeration_1()
-	filename << _self.fixture_path("restriction_enumeration_1.xsd")
-	loader << xsd_loader:xsd_loader_factory.generate_loader(filename, :target_package, :xsd_loader_test)
-	
-	# ensure it validates valid values
-	type << loader.types[{"urn:xsd_loader_test", "Re1"}]
-	instance << type.new("e1")
-	_self.assert(instance, :|~=|, _unset)
-_endmethod
-$
-
-_pragma(classify_level=unit_test, topic={xsd_loader})
-_method xsd_loader_factory_test.test_xsd_restriction_enumeration_2()
-	filename << _self.fixture_path("restriction_enumeration_2.xsd")
-	loader << xsd_loader:xsd_loader_factory.generate_loader(filename, :target_package, :xsd_loader_test)
-	
-	# ensure it give a warning on invalid values
-	type << loader.types[{"urn:xsd_loader_test", "Re2"}]
-	_self.assert_raised_condition(:xsd_loader_invalid_value_for_field, type, :|new()|, {"x1"})
-_endmethod
-$
-
-_pragma(classify_level=unit_test, topic={xsd_loader})
-_method xsd_loader_factory_test.test_restriction_pattern_1()
-	filename << _self.fixture_path("restriction_pattern_1.xsd")
-	loader << xsd_loader:xsd_loader_factory.generate_loader(filename, :target_package, :xsd_loader_test)
-	
-	# ensure it validates valid values
-	type << loader.types[{"urn:xsd_loader_test", "Rp1"}]
-	instance << type.new("test")
-	_self.assert(instance, :|~=|, _unset)
-_endmethod
-$
-
-_pragma(classify_level=unit_test, topic={xsd_loader})
-_method xsd_loader_factory_test.test_restriction_pattern_2()
-	filename << _self.fixture_path("restriction_pattern_2.xsd")
-	loader << xsd_loader:xsd_loader_factory.generate_loader(filename, :target_package, :xsd_loader_test)
-	
-	# ensure it validates valid values
-	type << loader.types[{"urn:xsd_loader_test", "Rp2"}]
-	_self.assert_raised_condition(:xsd_loader_invalid_value_for_field, type, :|new()|, {"123"})
+	xsd_element << type.xsd_elements["e1"]
+	_self.assert_not_unset(xsd_element)
+	_self.assert_equals(xsd_element[:magik_exemplar], get_global_value(:|xsd_loader_test:st1|))
+	_self.assert_equals(xsd_element[:magik_slot_name], :e1)
+	_self.assert_equals(xsd_element[:xsd_element_name], "e1")
+	_self.assert_equals(xsd_element[:xsd_namespace], "urn:xsd_loader_test")
+	_self.assert_equals(xsd_element[:xsd_name], "St1")
 _endmethod
 $

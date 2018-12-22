@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Ct3 xmlns="urn:xsd_loader_test">
+<ct3 xmlns="urn:xsd_loader_test">
   <e1>test_element</e1>
-</Ct3>
+</ct3>

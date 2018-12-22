@@ -10,4 +10,5 @@
       <xs:element name="e1" type="St1" />
     </xs:sequence>
   </xs:complexType>
+  <xs:element name="ct3" type="tns:Ct3"/>
 </xs:schema>
