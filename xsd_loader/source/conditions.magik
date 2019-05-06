@@ -5,8 +5,8 @@ _block
 	condition.define_condition(:xsd_loader_warning, :warning, {:string}, "XSD Loader warning")
 	condition.define_condition(:xsd_loader_information, :information, {:string}, "XSD Loader information")
 
-	condition.define_condition(:xsd_loading_missing_type, :error, {:namespace, :name}, "Missing type definition")
-	condition.define_condition(:xsd_loader_no_such_field, :warning, {:string}, "Field not known")
-	condition.define_condition(:xsd_loader_invalid_value_for_field, :warning, {:string}, "Invalid value for field")
+	condition.define_condition(:xsd_loading_missing_type, :xsd_loader_error, {:namespace, :name}, "Missing type definition")
+	condition.define_condition(:xsd_loader_no_such_field, :xsd_loader_error, {:string}, "Field not known")
+	condition.define_condition(:xsd_loader_invalid_value_for_field, :xsd_loader_warning, {:string}, "Invalid value for field")
 _endblock
 $

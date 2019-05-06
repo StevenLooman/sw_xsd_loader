@@ -89,6 +89,11 @@ _private _method xsd_loader.parse_xml_child(p_xml_child, p_parent_type)
 	## Parse an XML-element
 	l_child_name << p_xml_child.local_name.write_string
 	l_element << p_parent_type.xsd_elements[l_child_name]
+	_if l_element _is _unset
+	_then
+		_local l_parent_name << p_parent_type.xsd_name
+		condition.raise(:xsd_loader_no_such_field, :string, write_string(l_parent_name, " has no field ", l_child_name))
+	_endif
 	l_exemplar << l_element[:magik_exemplar]
 	l_child << _if l_exemplar _is _unset
 		   _then
