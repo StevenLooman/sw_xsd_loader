@@ -15,6 +15,8 @@ This module was written with supporting one project in mind. Not everything desc
 
 Also, this is not meant as a XML/XSD validator. If you want to check if your XML validates against a XSD, use proper tools for this.
 
+Currently, only Smallworld 5 is supported. Older versions support Smallworld 4.
+
 License
 -------
 
